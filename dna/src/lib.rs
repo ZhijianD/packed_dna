@@ -18,7 +18,7 @@ use std::{convert::TryFrom, fmt::Display, str::FromStr};
 /// A nucleotide
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Nuc {
-    /// Adenine
+    /// Adenine//
     A,
     /// Cytosine
     C,
