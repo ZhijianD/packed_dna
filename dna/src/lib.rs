@@ -14,6 +14,55 @@ use std::{convert::TryFrom, fmt::Display, str::FromStr};
 //
 // Make sure to unit test and document all elements
 // Also, the internal representation of the PackedDna struct should be privately scoped
+mod packed {
+    use std::{str::FromStr, iter::FromIterator, fmt::Display, convert::TryFrom};
+    use crate::{Nuc, ParseNucError};
+    #[derive(Debug, thiserror::Error)]
+    #[error("failed to generate DNA from string or iterator given")]
+    pub struct ParseDnaError();
+    
+    #[derive(Debug)]
+    pub struct PackedDna {
+         pub size: u32,
+         listOfNuc: Vec<Nuc>,
+         
+    }
+    
+    
+    impl FromStr for PackedDna {
+        type Err = ParseDnaError;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut v: Vec<Nuc> = Vec::new();
+            let mut size: u32 = 0;
+            for c in s.chars() {
+                let temp: Result<Nuc, ParseNucError<char>> = Nuc::try_from(c);
+                match temp {
+                    Ok(val) => v.push(val), 
+                    _ => return Err(ParseDnaError())
+                };
+                size = size + 1;
+            }
+            return Ok(PackedDna {size: size, listOfNuc: v })
+        }
+    }
+    // impl FromIterator<Nuc> for PackedDna {
+    //     fn from_iter(ptr: Iterator<Nuc>) -> PackedDna {
+            
+    //     }
+    // }
+    impl PackedDna {
+        pub fn get(&self, idx: usize) -> Nuc {
+            let e = self.listOfNuc.get(idx);
+            *e.unwrap()
+        }
+        // count number of each Nuc for given dna
+        pub fn nuc_counter(&self) {
+            for i in &self.listOfNuc {
+                println!("{:?}", i);
+            }
+        }
+    }
+}
 
 /// A nucleotide
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -64,15 +113,88 @@ impl FromStr for Nuc {
 
 #[cfg(test)]
 mod tests {
-    // TODO: fill in tests
+    // use std lib
+    use std::{convert::TryFrom, str::FromStr};
+    // use functions to be tested and Nuc
+    use crate::{Nuc, packed::{PackedDna}, ParseNucError};
 
     #[test]
     fn tryfrom_char() {
-        assert!(false);
+        // test case-insensitive inputs
+        let a = Nuc::try_from('a').unwrap();
+        let c = Nuc::try_from('C').unwrap();
+        let g = Nuc::try_from('g').unwrap();
+        let t = Nuc::try_from('T').unwrap();
+        assert!(a == Nuc::A);
+        assert!(c == Nuc::C);
+        assert!(g == Nuc::G);
+        assert!(t == Nuc::T);
+
+        // test invalid char inputs
+        let invalid1 = Nuc::try_from('W');
+        let invalid2 = Nuc::try_from('?');
+        let invalid3 = Nuc::try_from(' ');
+        assert!(invalid1.is_err());
+        assert!(invalid2.is_err());
+        assert!(invalid3.is_err());
     }
 
     #[test]
-    fn fromstr() {
-        assert!(false);
+    fn fromstr_nuc() {
+        // test case insensitive inputs
+        let a = Nuc::from_str("a").unwrap();
+        let c = Nuc::from_str("C").unwrap();
+        let g = Nuc::from_str("g").unwrap();
+        let t = Nuc::from_str("T").unwrap();
+        assert!(a == Nuc::A);
+        assert!(c == Nuc::C);
+        assert!(g == Nuc::G);
+        assert!(t == Nuc::T);
+
+        // test invalid string inputs
+        let invalid1 = Nuc::from_str("W");
+        let invalid2 = Nuc::from_str("?");
+        let invalid3 = Nuc::from_str(" ");
+        let invalid4 = Nuc::from_str("AGC");
+        let invalid5 = Nuc::from_str(">?:");
+        assert!(invalid1.is_err());
+        assert!(invalid2.is_err());
+        assert!(invalid3.is_err());
+        assert!(invalid4.is_err());
+        assert!(invalid5.is_err());
+    }
+
+    #[test]
+    fn fromstr_dna() {
+        // test case insensitive valid dna input
+        let a = PackedDna::from_str("a").unwrap();
+        let c = PackedDna::from_str("C").unwrap();
+        let g = PackedDna::from_str("g").unwrap();
+        let t = PackedDna::from_str("T").unwrap();
+        let acgt = PackedDna::from_str("aCgT").unwrap();
+        assert!(a.get(0) == Nuc::A);
+        assert!(c.get(0) == Nuc::C);
+        assert!(g.get(0) == Nuc::G);
+        assert!(t.get(0) == Nuc::T);
+        assert!(acgt.get(0) == Nuc::A);
+        assert!(acgt.get(1) == Nuc::C);
+        assert!(acgt.get(2) == Nuc::G);
+        assert!(acgt.get(3) == Nuc::T);
+
+        // test invalid inputs
+        let invalid1 = PackedDna::from_str("AeWrc");
+        let invalid2 = PackedDna::from_str(" ACGT_");
+        let invalid3 = PackedDna::from_str("+%acgt");
+        let invalid4 = PackedDna::from_str("cagt!");
+        assert!(invalid1.is_err());
+        assert!(invalid2.is_err());
+        assert!(invalid3.is_err());
+        assert!(invalid4.is_err());
+    }
+
+    #[test]
+    fn fromitr_dna() {
+        let acgt = PackedDna::from_str("aCgT").unwrap();
+        acgt.nuc_counter();
     }
 }
