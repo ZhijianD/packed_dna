@@ -1,8 +1,7 @@
 //! A general-purpose genomics crate for dealing with DNA.
 
 #![warn(missing_docs)]
-
-use std::{convert::TryFrom, fmt::Display, str::FromStr};
+use std::{convert::TryFrom, fmt::Display, str::FromStr, slice::Iter};
 
 // TODO: add a packed module with the PackedDna struct
 //
@@ -15,7 +14,8 @@ use std::{convert::TryFrom, fmt::Display, str::FromStr};
 // Make sure to unit test and document all elements
 // Also, the internal representation of the PackedDna struct should be privately scoped
 mod packed {
-    use std::{str::FromStr, iter::FromIterator, fmt::Display, convert::TryFrom};
+    use super::*;
+    use std::iter::FromIterator;
     use crate::{Nuc, ParseNucError};
     #[derive(Debug, thiserror::Error)]
     #[error("failed to generate DNA from string or iterator given")]
@@ -23,17 +23,16 @@ mod packed {
     
     #[derive(Debug)]
     pub struct PackedDna {
-         pub size: u32,
-         listOfNuc: Vec<Nuc>,
+         size: usize,
+         list_of_nuc: Vec<Nuc>,
          
     }
-    
     
     impl FromStr for PackedDna {
         type Err = ParseDnaError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let mut v: Vec<Nuc> = Vec::new();
-            let mut size: u32 = 0;
+            let mut size: usize = 0;
             for c in s.chars() {
                 let temp: Result<Nuc, ParseNucError<char>> = Nuc::try_from(c);
                 match temp {
@@ -42,22 +41,25 @@ mod packed {
                 };
                 size = size + 1;
             }
-            return Ok(PackedDna {size: size, listOfNuc: v })
+            return Ok(PackedDna {size: size, list_of_nuc: v })
         }
     }
-    // impl FromIterator<Nuc> for PackedDna {
-    //     fn from_iter(ptr: Iterator<Nuc>) -> PackedDna {
-            
-    //     }
-    // }
+
+    impl FromIterator<Nuc> for PackedDna {
+        fn from_iter<I: IntoIterator<Item = Nuc>>(iter: I) -> PackedDna {
+            let content: Vec<Nuc> = iter.into_iter().collect();
+            let size: usize = content.len();
+            PackedDna { size: size, list_of_nuc: content }
+        }
+    }
     impl PackedDna {
         pub fn get(&self, idx: usize) -> Nuc {
-            let e = self.listOfNuc.get(idx);
+            let e = self.list_of_nuc.get(idx);
             *e.unwrap()
         }
         // count number of each Nuc for given dna
         pub fn nuc_counter(&self) {
-            for i in &self.listOfNuc {
+            for i in &self.list_of_nuc {
                 println!("{:?}", i);
             }
         }
@@ -113,10 +115,11 @@ impl FromStr for Nuc {
 
 #[cfg(test)]
 mod tests {
-    // use std lib
-    use std::{convert::TryFrom, str::FromStr};
-    // use functions to be tested and Nuc
-    use crate::{Nuc, packed::{PackedDna}, ParseNucError};
+    use std::iter::FromIterator;
+
+    // use structs and functions to be tested
+    use super::*;
+    use crate::packed::{PackedDna};
 
     #[test]
     fn tryfrom_char() {
@@ -193,8 +196,11 @@ mod tests {
     }
 
     #[test]
-    fn fromitr_dna() {
-        let acgt = PackedDna::from_str("aCgT").unwrap();
-        acgt.nuc_counter();
+    fn fromiter_dna() {
+        let acgt:PackedDna = PackedDna::from_iter(vec![Nuc::A, Nuc::C, Nuc::G, Nuc::T].into_iter());
+        assert_eq!(acgt.get(0), Nuc::A);
+        assert_eq!(acgt.get(1), Nuc::C);
+        assert_eq!(acgt.get(2), Nuc::G);
+        assert_eq!(acgt.get(3), Nuc::T);
     }
 }
