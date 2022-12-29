@@ -1,7 +1,7 @@
 //! A general-purpose genomics crate for dealing with DNA.
 
 #![warn(missing_docs)]
-use std::{convert::TryFrom, fmt::Display, str::FromStr, slice::Iter};
+use std::{convert::TryFrom, fmt::Display, str::FromStr};
 
 // TODO: add a packed module with the PackedDna struct
 //
@@ -13,51 +13,179 @@ use std::{convert::TryFrom, fmt::Display, str::FromStr, slice::Iter};
 //
 // Make sure to unit test and document all elements
 // Also, the internal representation of the PackedDna struct should be privately scoped
-mod packed {
+pub mod packed {
     use super::*;
-    use std::iter::FromIterator;
-    use crate::{Nuc, ParseNucError};
+    use std::{iter::FromIterator, convert::TryInto};
+
+    /// An error that can occur when parsing a DNA.
     #[derive(Debug, thiserror::Error)]
     #[error("failed to generate DNA from string or iterator given")]
     pub struct ParseDnaError();
-    
+
+    /// wrapper of individual byte
+    /// content contains 4 Nucleotides, unoccupied bits are zeros
+    /// Each nucleotide takes 2 bit with following representation: 
+    /// {00: Nuc::A, 
+    ///  01: Nuc::C, 
+    ///  10: Nuc::G, 
+    ///  11: Nuc::T}
+    /// e.g. ACGT => 00011011 (27)
     #[derive(Debug)]
-    pub struct PackedDna {
-         size: usize,
-         list_of_nuc: Vec<Nuc>,
-         
+    struct Node {
+        content: u8,
     }
     
+    /// A DNA with its size and list of Nodes
+    /// e.g. ACTGAT => list[0b0001_1110, 0b0011_0000], size = 6
+    #[derive(Debug)]
+    pub struct PackedDna {
+        size: usize,
+        list_of_nuc: Vec<Node>,
+    }
+    
+    /// Create Dna from given string slice
     impl FromStr for PackedDna {
         type Err = ParseDnaError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let mut v: Vec<Nuc> = Vec::new();
-            let mut size: usize = 0;
-            for c in s.chars() {
-                let temp: Result<Nuc, ParseNucError<char>> = Nuc::try_from(c);
-                match temp {
-                    Ok(val) => v.push(val), 
+            let length: usize = s.len();
+            let mut num_nodes: usize = length / 4; // num of nodes required
+            let last_size: usize = length % 4; // size of last node
+            if (last_size != 0) { // offset
+                num_nodes += 1;
+            }
+            let mut res_list: Vec<Node> = vec![]; // result list
+            let mut str_index: usize = 0; // pointer to characters in s
+            let mut res_index: usize = 0; // pointer to nodes in result
+            while res_index < num_nodes {
+                let mut content: u8 = 0b00_00_00_00; // content of current node
+
+                // generate next 4 nucleotide, will throw ParseDnaError if cannot parse nucleotide
+                let s0= Nuc::try_from(s.chars().nth(str_index).unwrap());
+                let s0 = match s0 {
+                    Ok(val) => val, 
                     _ => return Err(ParseDnaError())
                 };
-                size = size + 1;
+                let s1= s.chars().nth(str_index+1);
+                let s2= s.chars().nth(str_index+2);
+                let s3= s.chars().nth(str_index+3);
+
+                content = PackedDna::encoder(content, s0, 0);
+
+                if s1 != None {
+                    let s1 = Nuc::try_from(s1.unwrap());
+                    let s1 = match s1 {
+                        Ok(val) => val, 
+                        _ => return Err(ParseDnaError())
+                    };
+                    content = PackedDna::encoder(content, s1, 2);
+                }
+
+                if s2 != None {
+                    let s2 = Nuc::try_from(s2.unwrap());
+                    let s2 = match s2 {
+                        Ok(val) => val, 
+                        _ => return Err(ParseDnaError())
+                    };
+                    content = PackedDna::encoder(content, s2, 4);
+                }
+                if s3 != None {
+                    let s3 = Nuc::try_from(s3.unwrap());
+                    let s3 = match s3 {
+                        Ok(val) => val, 
+                        _ => return Err(ParseDnaError())
+                    };
+                    content = PackedDna::encoder(content, s3, 6);
+                }
+
+                res_list.push(Node{content});
+                str_index += 4; // iterate over next 4 character in s
+                res_index += 1;
             }
-            return Ok(PackedDna {size: size, list_of_nuc: v })
+            Ok(PackedDna { size: length, list_of_nuc: res_list })
         }
     }
 
+    /// Create Dna from given Nucleotide Iterator
     impl FromIterator<Nuc> for PackedDna {
         fn from_iter<I: IntoIterator<Item = Nuc>>(iter: I) -> PackedDna {
-            let content: Vec<Nuc> = iter.into_iter().collect();
-            let size: usize = content.len();
-            PackedDna { size: size, list_of_nuc: content }
+            let mut iter: <I as IntoIterator>::IntoIter = iter.into_iter();
+            let mut size: usize = 0;
+            let mut node_list: Vec<Node> = vec![];
+            loop {
+                let mut content: u8 = 0b00_00_00_00;
+
+                // get next 4 Nucleotides if possible
+                let s0: Option<Nuc> = iter.next();
+                let s1: Option<Nuc> = if s0 != None {iter.next()} else {None};
+                let s2: Option<Nuc> = if s1 != None {iter.next()} else {None};
+                let s3: Option<Nuc> = if s2 != None {iter.next()} else {None};
+
+                // encode byte with all 4 nucleotide if they exist
+                if s0.is_some() {
+                    content = PackedDna::encoder(content, s0.unwrap(), 0);
+                    size += 1;
+                } else {
+                    break;
+                }
+                if s1.is_some() {
+                    content = PackedDna::encoder(content, s1.unwrap(), 2);
+                    size += 1;
+                }
+                if s2.is_some() {
+                    content = PackedDna::encoder(content, s2.unwrap(), 4);
+                    size += 1;
+                }
+                if s3.is_some() {
+                    content = PackedDna::encoder(content, s3.unwrap(), 6);
+                    size += 1;
+                }
+                node_list.push(Node{content});
+                if s1.is_none() || s2.is_none() || s3.is_none() {
+                    break;
+                }
+            }
+            return PackedDna { size: size, list_of_nuc: node_list }
         }
     }
+
     impl PackedDna {
-        pub fn get(&self, idx: usize) -> Nuc {
-            let e = self.list_of_nuc.get(idx);
-            *e.unwrap()
+        // encode content with nucleotide at position, return encoded content
+        fn encoder(content: u8, nuc: Nuc, pos: u32) -> u8 {
+            match nuc {
+                Nuc::C => content | (0b01_00_00_00) >> pos,
+                Nuc::G => content | (0b10_00_00_00) >> pos,
+                Nuc::T => content | (0b11_00_00_00) >> pos,
+                _ => content | (0b00_00_00_00) >> pos,
+            }
         }
-        // count number of each Nuc for given dna
+        /// Get Nucleotide at idx (starting from 0)
+        pub fn get(&self, idx: usize) -> Nuc {
+            if idx >= self.size {
+                panic!("Index out of bound!");
+            }
+            let idx: u32 = idx.try_into().unwrap(); // type casting
+            let node_num: u32 = idx / 4; // which node does this nucleotide belongs to
+            let remainder: u32 = idx % 4; // index of nucleotide in this node
+
+            let node = self.list_of_nuc.iter().nth(node_num.try_into().unwrap()).unwrap(); // reference of target node
+
+            // byte representation of the nucleotide
+            let res_in_byte = match remainder {
+                0 => (node.content & 0b11_00_00_00) >> 6, 
+                1 => ((node.content & 0b00_11_00_00) << 2) >> 6, 
+                2 => ((node.content & 0b00_00_11_00) << 4) >> 6, 
+                3 => ((node.content & 0b00_00_00_11) << 6) >> 6,
+                _ => 0b0000_0000
+            };
+            match res_in_byte {
+                0b00_00_00_00 => Nuc::A, 
+                0b00_00_00_01 => Nuc::C, 
+                0b00_00_00_10 => Nuc::G, 
+                _ => Nuc::T, 
+            }
+        }
+
+        /// count number of each Nuc for given dna
         pub fn nuc_counter(&self) {
             for i in &self.list_of_nuc {
                 println!("{:?}", i);

@@ -17,6 +17,9 @@
 //
 // be sure to exit with informative error messages if the input is invalid
 
+use std::str::FromStr;
+
+use dna::packed::{self, PackedDna};
 use structopt::StructOpt;
 
 /// Count the number of occurrences of each nucleotide in the provided DNA.
@@ -26,11 +29,11 @@ struct Opts {
     ///
     /// It is case insensitive but only nucleotides A, C, G and T are supported.
     #[structopt(short = "d", long, required = true)]
-    dna: String
+    dna: String,
 }
 
 fn main() {
     let opts = Opts::from_args();
     let dna = opts.dna;
-    println!("Input: {}", &dna);
+    println!("Input: {:?}", PackedDna::from_str(&dna));
 }
