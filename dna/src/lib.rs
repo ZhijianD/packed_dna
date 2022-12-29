@@ -146,10 +146,10 @@ pub mod packed {
                     break;
                 }
             }
-            return PackedDna {
-                size: size,
+            PackedDna {
+                size,
                 list_of_nuc: node_list,
-            };
+            }
         }
     }
 
