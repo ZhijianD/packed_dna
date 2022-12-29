@@ -1,7 +1,10 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\dna",
+    "\\dna\\src",
+    "\\nuccount",
+    "\\nuccount\\src"
   ],
-  "SelectedNode": "\\C:\\Users\\Alex\\Source\\Repos\\packed_dna",
   "PreviewInSolutionExplorer": false
 }

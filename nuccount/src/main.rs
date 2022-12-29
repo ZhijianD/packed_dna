@@ -1,4 +1,4 @@
-// TODO: implement a nucleotide counter
+// a nucleotide counter
 //
 // command line argument parsing has been provided
 // you must use the PackedDna struct you previously implemented
@@ -17,9 +17,8 @@
 //
 // be sure to exit with informative error messages if the input is invalid
 
+use dna::packed::PackedDna;
 use std::str::FromStr;
-
-use dna::packed::{self, PackedDna};
 use structopt::StructOpt;
 
 /// Count the number of occurrences of each nucleotide in the provided DNA.
@@ -35,5 +34,6 @@ struct Opts {
 fn main() {
     let opts = Opts::from_args();
     let dna = opts.dna;
-    println!("Input: {:?}", PackedDna::from_str(&dna));
+    let dna = PackedDna::from_str(&dna).unwrap();
+    dna.nuc_counter();
 }
